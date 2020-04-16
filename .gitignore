@@ -1,0 +1,41 @@
+# Files and content not to be tracked
+
+
+#
+# Data Set Related -- to ensure we have matching pointers
+# 
+yelp_dataset
+
+#
+# Target and Gen Dirs
+#
+*/target/
+*/gen/
+
+
+
+#
+# Compiled Sources
+# 
+
+# General
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Latex specific (continuous compiler)
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+
+#
+# Environment
+#
+*.localized
