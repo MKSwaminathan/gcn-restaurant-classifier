@@ -27,7 +27,7 @@ import sys
 
 #Read json entries into a list. Now can basically use the list as a python dictionary
 restaurants = []
-for line in open('yelp_dataset/yelp_academic_dataset_business.json', 'r'):
+for line in open('../yelp_dataset/yelp_academic_dataset_business.json', 'r'):
     restaurants.append(json.loads(line))
 
 #Function for computing distance from latitude and longitude coordinates
