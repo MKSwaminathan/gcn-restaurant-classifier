@@ -5,8 +5,8 @@
 # Data Set Related -- to ensure we have matching pointers
 # 
 yelp_dataset
-*.csv
 *.dat
+*.nzp
 
 #
 # Target and Gen Dirs
