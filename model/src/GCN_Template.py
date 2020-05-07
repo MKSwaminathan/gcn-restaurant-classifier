@@ -29,7 +29,6 @@ class GCNLayer(torch.nn.Module):
         H_out = torch.empty(self.nodes,self.out_features).type(dtype)
         H_out.fill_(0)
         for index in range(self.nodes):
-            #print('Iteration percentage: ',(index/self.nodes)*100,'%')
             aggregate = self.make_aggregate(index, A, H)
             H_out[index] = F.linear(aggregate, self.kernel)
         return H_out
@@ -62,23 +61,51 @@ class GCN(torch.nn.Module):
         return h
 
 
+# Sample
+# X -> 5x5
+# A -> 5x5
+# W1 -> 5x3
+# W2 -> 3x2
+# H1-> 5x3
+# y -> 5x1
+
+N = 5
+A = torch.tensor([[1,0,0,0,1],
+                  [0,1,0,0,0],
+                  [0,0,1,0,0],
+                  [0,0,0,1,0],
+                  [1,0,0,0,1]]).type(dtype)
+
+X = torch.tensor([[1,1,1,1,1],
+                  [0,0,0,0,0],
+                  [0,0,0,0,0],
+                  [0,0,0,0,0],
+                  [1,1,1,1,1]]).type(dtype)
+
+y = torch.tensor([[1],
+                  [0],
+                  [0],
+                  [0],
+                  [1]]).type(dtype)
+
+X = Variable(X)
+A = Variable(A)
+y = Variable(y, requires_grad=False)
 
 from load_dataset import *
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
 
 #
 # DEFINE MODEL
 #
-model = GCN(N,num_features,2,1)
+model = GCN(N,5,3,1)
 
 #
 # HYPERPARAMS
 #
-lr = 0.01
+lr = 1e-1
 betas = (0.9,0.99)
 weight_decay = 0
-epochs = 10
+epochs = 50
 
 loss_fn = torch.nn.MSELoss(size_average=False)
 optimizer = torch.optim.Adam(model.parameters(), 
@@ -87,19 +114,12 @@ optimizer = torch.optim.Adam(model.parameters(),
                              weight_decay=0)
 
 import tqdm
-from sklearn import metrics
 for t in range(epochs):
-    print('Epoch: ',t,'/',epochs)
-    y_pred = model(A,X)
+    y_pred = model(X,A)
     loss = loss_fn(y_pred, y)
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
-    # Find AUC
-    y_hat = y_pred.data.numpy()
-    y_true = y.data.numpy()
-    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_hat)
-    AUC = metrics.auc(fpr, tpr)
-    print('AUC SCORE: ',AUC, ' Loss: ',loss.item())
+    print(loss.item())
