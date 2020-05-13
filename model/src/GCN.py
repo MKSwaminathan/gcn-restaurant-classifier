@@ -47,18 +47,24 @@ class GCNLayer(torch.nn.Module):
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, nodes, x_dim, h1_dim, classes):
+    def __init__(self, nodes, x_dim, h1_dim, h2_dim, h3_dim, classes):
 
         super(GCN, self).__init__()
         self.gcn1 = GCNLayer(nodes, x_dim, h1_dim)
-        self.gcn2 = GCNLayer(nodes, h1_dim, classes)
+        self.gcn2 = GCNLayer(nodes, h1_dim, h2_dim)
+        self.gcn3 = GCNLayer(nodes, h2_dim, h3_dim)
+        self.gcn4 = GCNLayer(nodes, h3_dim, classes)
         self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self, A, X):
         h = self.gcn1(A, X)
         h = torch.relu(h)
         h = self.gcn2(A, h)
-        h = self.sigmoid(h)
+        h = torch.relu(h)
+        h = self.gcn3(A, h)
+        h = torch.relu(h)
+        h = self.gcn4(A, h)
+        #h = self.sigmoid(h)
         return h
 
 
@@ -70,7 +76,7 @@ device = torch.device("cpu")
 #
 # DEFINE MODEL
 #
-model = GCN(N,num_features,2,1)
+model = GCN(N,num_features,10,5,2,1)
 
 #
 # HYPERPARAMS
@@ -78,28 +84,56 @@ model = GCN(N,num_features,2,1)
 lr = 0.01
 betas = (0.9,0.99)
 weight_decay = 0
-epochs = 10
+epochs = 20
 
 loss_fn = torch.nn.MSELoss(size_average=False)
+#loss_fn = torch.nn.CrossEntropyLoss(size_average=False)
+#loss_fn = torch.nn.NLLLoss()
 optimizer = torch.optim.Adam(model.parameters(), 
                              lr=lr, 
                              betas=betas,
                              weight_decay=0)
+
+
+best_auc = 0
+best_model = GCN(N,num_features,10,5,2,1)
 
 import tqdm
 from sklearn import metrics
 for t in range(epochs):
     print('Epoch: ',t,'/',epochs)
     y_pred = model(A,X)
-    loss = loss_fn(y_pred, y)
+    #loss = loss_fn(y_pred, y)
+    #print(y.size())
+    #print(y_pred.size())
+    #loss = torch.sum((y - y_pred)**2))
+    hinge_loss = y - y_pred + 1
+    hinge_loss[hinge_loss < 0] = 0
+    loss = torch.sum(hinge_loss)
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
     # Find AUC
+    #y_predi = torch.abs(1-y_pred)
     y_hat = y_pred.data.numpy()
     y_true = y.data.numpy()
     fpr, tpr, thresholds = metrics.roc_curve(y_true, y_hat)
     AUC = metrics.auc(fpr, tpr)
+    if AUC > best_auc:
+        best_auc = AUC
+        best_model = model
     print('AUC SCORE: ',AUC, ' Loss: ',loss.item())
+
+
+# Find AUC for Test Set
+y_pred = best_model(A_test,X_test)
+y_true = y_test.data.numpy()
+y_hat = y_pred.data.numpy()
+fpr, tpr, thresholds = metrics.roc_curve(y_true, y_hat)
+AUC = metrics.auc(fpr, tpr)
+print('Test AUC SCORE: ',AUC)
+
+
+
