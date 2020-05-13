@@ -11,30 +11,37 @@ from torch.autograd import Variable
 dtype = torch.FloatTensor
 
 class GCNLayer(torch.nn.Module):
-    def __init__(self, nodes, in_features, out_features):
-        
+    def __init__(self, nodes, in_features, out_features, isrelu=True):
         super(GCNLayer, self).__init__()
         self.kernel = torch.nn.Parameter(torch.Tensor(out_features, in_features))
         self.out_features = out_features
         self.nodes = nodes
-        self.init_params()
+        if isrelu:
+            self.init_params_relu()
+        else:
+            self.init_params()
 
-    def init_params(self):
+    def init_params_relu(self):
         # He initializations are generally better for ReLU activations:
         # Source: He, K. et al. (2015)
         tinit.kaiming_uniform_(self.kernel, a=math.sqrt(5))
-        
+    
+    def init_params(self):
+        # Xavier initializations are universally good - He is better for relu though 
+        tinit.xavier_uniform_(self.kernel, gain=nn.init.calculate_gain('sigmoid'))
+
     def forward(self, A, H):
         # Iterate over all nodes and "convolve"
         H_out = torch.empty(self.nodes,self.out_features).type(dtype)
         H_out.fill_(0)
         for index in range(self.nodes):
             #print('Iteration percentage: ',(index/self.nodes)*100,'%')
-            aggregate = self.make_aggregate(index, A, H)
+            # NOTE: here you can define which aggregate policy to use
+            aggregate = self.make_aggregate_mean(index, A, H)
             H_out[index] = F.linear(aggregate, self.kernel)
         return H_out
 
-    def make_aggregate(self, index, A, H):
+    def make_aggregate_mean(self, index, A, H):
         aggregate = torch.empty(1,list(H.size())[1]).type(dtype)
         aggregate.fill_(0)
         n_neighbors = 1
@@ -43,6 +50,31 @@ class GCNLayer(torch.nn.Module):
                 aggregate = aggregate + H[neighbor_index]
                 n_neighbors+=1
         return aggregate/n_neighbors
+
+    def make_aggregate_weighted_mean(self, index, A, H):
+        aggregate = torch.empty(1,list(H.size())[1]).type(dtype)
+        aggregate.fill_(0)
+        n_neighbors = 1
+        for neighbor_index in range(self.nodes):
+            if A[index,neighbor_index] != torch.tensor(0).type(dtype):
+                aggregate = aggregate + H[neighbor_index]
+                n_neighbors+=1
+        # This is a param that can be changed
+        self_weight_factor = n_neighbors
+        aggregate = aggregate + self_weight_factor*H[index]
+
+        return aggregate/(n_neighbors + self_weight_factor)
+
+   def make_aggregate_sum(self, index, A, H):
+        aggregate = torch.empty(1,list(H.size())[1]).type(dtype)
+        aggregate.fill_(0)
+        n_neighbors = 1
+        for neighbor_index in range(self.nodes):
+            if A[index,neighbor_index] != torch.tensor(0).type(dtype):
+                aggregate = aggregate + H[neighbor_index]
+                n_neighbors+=1
+        return aggregate
+
 
 
 
